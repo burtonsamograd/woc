@@ -2,18 +2,24 @@ woc - word occurance
 --------------------
 
 This program is designed to count the number of occurances of a set of
-words in a set of files and produce a score listing.  It's a poor
-man's google for the unix filesystem.
+words in a set of files and produce a score listing.  
 
-usage: woc [words...] -- [files or directories...]
+It's a poor man's Google for the filesystem.
+
+usage: woc [words...] <-- [files or directories...]>
 
 Putting a '-' in front of a word will invert it's count value in the
 results.
 
 If a directory is specified after --, all of the files in that
-directory will be scanned.
+directory will be scanned.  If no files or directories re specified,
+the current directory is used.
+
+Exapmle:
+
+    $ woc woc # count all occurances of the word 'woc' in the files at
+              #  and below the current directory
 
 --
-Burton Samograd - 2012
+Burton Samograd - 2016
 burton.samograd@gmail.com
-http://kruhft.dyndns.org
