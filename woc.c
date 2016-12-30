@@ -22,8 +22,7 @@
 #include <fcntl.h>
 #include <sys/stat.h>
 #include <sys/mman.h>
-
-
+#include <sys/syslimits.h>
 
 int count_occurances(char** words, int num_words, char* filename) {
   FILE* file = fopen(filename, "r");
@@ -69,6 +68,47 @@ int count_occurances(char** words, int num_words, char* filename) {
   return match_count;
 }
 
+void woc(char* file, char** words, int num_words) {
+    int match_count;
+    /* see if a directory is specified */
+    DIR* dir = opendir(file);
+    if(dir) {
+      /* we got a directory */
+      int filesilen = strlen(file);
+      if(file[filesilen-1] == '/') {
+	/* strip off trailing / if present */
+	file[filesilen-1] = '\0';
+      }
+      struct dirent* entry;
+      char path[PATH_MAX];
+      while((entry = readdir(dir))) {
+	/* traverse the files in the directory */
+	struct stat buf;
+	if(!(!strcmp(entry->d_name, ".") || !strcmp(entry->d_name, ".."))) {
+            snprintf(path, PATH_MAX, "%s/%s", file, entry->d_name);
+	    stat(path, &buf);
+	    if(S_ISDIR(buf.st_mode)) {
+	        /* Recurse subdirectories */
+	        woc(path, words, num_words);
+            } else {
+    	        /* do match count */
+	        match_count = count_occurances(words, num_words, path);
+	        if(match_count > 0) {
+	            fprintf(stdout, "%d\t%s\n", match_count, path);
+	        }
+            }
+         }
+      }
+      closedir(dir);
+    } else {
+      /* we have a file specified, do match count */
+      match_count = count_occurances(words, num_words, file);
+      if(match_count > 0) {
+	fprintf(stdout, "%d\t%s\n", match_count, file);
+      }
+    }
+}
+
 void usage(void) {
   fprintf(stderr, "usage: woc [words...] -- [files or directories...]\n");
   fprintf(stderr, "count the number of occurances of words in files or files in directories\n");
@@ -94,12 +134,20 @@ int main(int argc, char **argv) {
     }
   }
 
-  if(argc < 3 || help_requested) {
+  if(argc < 2 || help_requested) {
     usage();
     exit(1);
   }
+
+  char use_defaults = num_files == 0;
+  if(num_files == 0) {
+      num_files++;
+  }
   char* words[num_words];
   char* files[num_files];
+  if(use_defaults) {
+      files[0] = ".";
+  }
   for(i = words_start; i < words_start + num_words; i++) {
     /* uppercase word */
     for(j = 0; j < strlen(argv[i]); j++) {
@@ -107,46 +155,13 @@ int main(int argc, char **argv) {
     }
     words[i-words_start] = argv[i];
   }
-  for(i = files_start; i < files_start + num_files; i++) {
-    files[i-files_start] = argv[i];
+  if(!use_defaults) {
+      for(i = files_start; i < files_start + num_files; i++) {
+        files[i-files_start] = argv[i];
+      }
   }
-
   for(i = 0; i < num_files; i++) {
-    int match_count;
-    /* see if a directory is specified */
-    DIR* dir = opendir(files[i]);
-    if(dir) {
-      /* we got a directory */
-      int filesilen = strlen(files[i]);
-      if(files[i][filesilen-1] == '/') {
-	/* strip off trailing / if present */
-	files[i][filesilen-1] = '\0';
-      }
-      struct dirent* entry;
-      char path[PATH_MAX];
-      while((entry = readdir(dir))) {
-	/* traverse the files in the directory */
-	struct stat buf;
-	snprintf(path, PATH_MAX, "%s/%s", files[i], entry->d_name);
-	stat(path, &buf);
-	if(S_ISDIR(buf.st_mode)) {
-	  /* skip directories */
-	  continue;
-	}
-	/* do match count */
-	match_count = count_occurances(words, num_words, path);
-	if(match_count > 0) {
-	  fprintf(stdout, "%d\t%s\n", match_count, path);
-	}
-      }
-      closedir(dir);
-    } else {
-      /* we have a file specified, do match count */
-      match_count = count_occurances(words, num_words, files[i]);
-      if(match_count > 0) {
-	fprintf(stdout, "%d\t%s\n", match_count, files[i]);
-      }
-    }
+      woc(files[i], words, num_words);
   }
   return 0;
 }
